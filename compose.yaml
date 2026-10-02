@@ -1,0 +1,57 @@
+services:
+  mc:
+    image: itzg/minecraft-server:java25
+    container_name: mc
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    ports:
+      - "25565:25565"
+    environment:
+      EULA: "TRUE"
+      TYPE: "FABRIC"
+      VERSION: "${MC_VERSION:?set MC_VERSION in .env}"
+      TZ: "${TZ:-Asia/Jakarta}"
+      MEMORY: "${MC_MEMORY:-6G}"
+      USE_AIKAR_FLAGS: "true"
+      ONLINE_MODE: "${ONLINE_MODE:-TRUE}"
+      # Required when ONLINE_MODE=FALSE: offline players have no Mojang-signed chat key, so the
+      # server must stop requiring one or they can't join at all (EasyAuth warns about this too).
+      ENFORCE_SECURE_PROFILE: "${ONLINE_MODE:-TRUE}"
+      # TODO: whitelist disabled by human's request so anyone with a Minecraft account can join.
+      # The itzg image force-enables the whitelist whenever WHITELIST is non-empty, regardless
+      # of these flags, so WHITELIST must also be emptied in .env for this to take effect.
+      # To re-enable: set both flags back to "TRUE", put real usernames in WHITELIST in .env,
+      # then run `docker compose up -d`.
+      ENABLE_WHITELIST: "FALSE"
+      ENFORCE_WHITELIST: "FALSE"
+      WHITELIST: "${WHITELIST:-}"
+      OPS: "${OPS:-}"
+      MOTD: "${MC_MOTD:-Friends server} | ${SERVER_DOMAIN:?set SERVER_DOMAIN in .env}"
+      MAX_PLAYERS: "${MAX_PLAYERS:-10}"
+      DIFFICULTY: "${DIFFICULTY:-normal}"
+      VIEW_DISTANCE: "${VIEW_DISTANCE:-10}"
+      SIMULATION_DISTANCE: "${SIMULATION_DISTANCE:-8}"
+      ENABLE_RCON: "true"
+      # TODO(security): passwordless for now by the human's decision (uses the image default).
+      # Acceptable only because 25575 is never published. Set RCON_PASSWORD in .env to secure it later.
+      RCON_PASSWORD: "${RCON_PASSWORD:-minecraft}"
+      MODRINTH_PROJECTS: "${MODRINTH_PROJECTS:-fabric-api}"
+    volumes:
+      - ./data:/data
+
+  backup:
+    image: itzg/mc-backup
+    container_name: mc-backup
+    restart: unless-stopped
+    depends_on:
+      - mc
+    environment:
+      BACKUP_INTERVAL: "${BACKUP_INTERVAL:-6h}"
+      INITIAL_DELAY: "5m"
+      PRUNE_BACKUPS_DAYS: "${PRUNE_BACKUPS_DAYS:-7}"
+      RCON_HOST: mc
+      RCON_PASSWORD: "${RCON_PASSWORD:-minecraft}"
+    volumes:
+      - ./data:/data:ro
+      - ./backups:/backups
